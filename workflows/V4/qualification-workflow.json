@@ -1,0 +1,615 @@
+{
+  "name": "Prospect Qualification V4 - reMaster",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q4eqx1gJTvDgk9Kt1j91jKekm9EYbpK_54MYCFA981A",
+          "mode": "list",
+          "cachedResultName": "Dexprovider_Prospects_Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q4eqx1gJTvDgk9Kt1j91jKekm9EYbpK_54MYCFA981A/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2125272569,
+          "mode": "list",
+          "cachedResultName": "Sheet1-Main Prospect Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q4eqx1gJTvDgk9Kt1j91jKekm9EYbpK_54MYCFA981A/edit#gid=2125272569"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        592,
+        544
+      ],
+      "id": "bf90e19c-4bdd-410c-b0b3-3c437ea82860",
+      "name": "Lire Prospects Master1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mfIBL6Xr67cXijxs",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nlet Score = 0;\n\n// 1. Recrutement en cours (30 pts)\nconst recrutement = (data[\"Recrutement en cours\"] || \"\").toLowerCase();\nif (recrutement === \"oui\") Score += 30;\n\n// 2. Secteur cible (25 pts) — exact list from sheet formula\nconst targetSectors = [\n  \"BTP\",\n  \"Transport\",\n  \"Logistique\",\n  \"Santé\",\n  \"Restauration\",\n  \"Nettoyage\",\n  \"Cabinet comptable\",\n  \"immobilier\",\n  \"Immobilier\",\n  \"Service à domicile\",\n  \"Services à domicile\"\n];\nconst secteur = data[\"Secteur\"] || \"\";\nif (targetSectors.includes(secteur)) {\n  Score += 25;\n} else if (secteur === \"Autre\") {\n  Score += 10;\n}\n\n// 3. Effectif (20/15/10 pts)\nconst effectif = data[\"Effectif\"] || \"\";\nif (effectif === \"51-200\") Score += 20;\nelse if (effectif === \"11-50\") Score += 15;\nelse if (effectif === \"201-500\") Score += 10;\n\n// 4. Décideur identifié (15 pts)\nconst decideur = (data[\"Décideur identifié\"] || \"\").toLowerCase();\nif (decideur === \"oui\") Score += 15;\n\n// 5. Activité LinkedIn (10 pts)\nconst linkedin = (data[\"Activité LinkedIn\"] || \"\").toLowerCase();\nif (linkedin === \"oui\") Score += 10;\n\n// Priority\nlet Priorité = \"⚪ Faible\";\nif (Score >= 80) Priorité = \"🔥 Haute\";\nelse if (Score >= 50) Priorité = \"🟡 Moyenne\";\n\n// Correspondance ICP\nlet correspondanceICP = \"faible\";\nif (Score >= 80) correspondanceICP = \"élevée\";\nelse if (Score >= 50) correspondanceICP = \"moyen\";\n\nreturn [{\n  json: {\n    ...data,\n    Score,\n    Priorité,\n    correspondanceICP\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        544
+      ],
+      "id": "c3d3242b-54f5-4c8d-be61-bae36b3bbd37",
+      "name": "Calculate Score1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Tu es un consultant commercial senior spécialisé en externalisation RH pour Dexprovider.\n\nMission :\nAnalyser un prospect et rédiger une note CRM permettant à un commercial de comprendre rapidement :\n* pourquoi l'entreprise est intéressante ou non,\n* quels besoins RH sont les plus probables,\n* quels éléments justifient une prise de contact.\n\nRègles strictes :\n* Utilise uniquement les informations fournies.\n* N'invente aucun fait.\n* Ne suppose pas l'existence de difficultés internes.\n* Ne répète pas simplement les données du prospect.\n* Explique les conséquences des signaux observés.\n* Adopte un raisonnement commercial B2B.\n* Écris comme un consultant RH expérimenté.\n* Maximum 5 phrases pour la note.\n* Français professionnel.\n\nDonnées du prospect :\nEntreprise : {{ $json[\"Nom de l'Entreprise\"] }}\nSecteur : {{ $json[\"Secteur\"] }}\nEffectif : {{ $json[\"Effectif\"] }}\nRecrutement en cours : {{ $json[\"Recrutement en cours\"] }}\nOffres ouvertes : {{ $json[\"Nb offres actives\"] }}\nCroissance visible : {{ $json[\"Croissance visible\"] }}\nActivité LinkedIn : {{ $json[\"Activité LinkedIn\"] }}\nDécideur identifié : {{ $json[\"Décideur identifié\"] }}\nContact : {{ $json[\"Nom du contact\"] }}\nRôle du contact : {{ $json[\"Fonction\"] }}\nVille : {{ $json[\"Ville\"] }}\nScore interne : {{ $json.Score }}\nPriorité : {{ $json.Priorité }}\n\nRéponds UNIQUEMENT avec un JSON valide.\nLa réponse doit commencer par { et se terminer par }.\nAucun texte avant ou après le JSON.\n\nFormat obligatoire :\n{\n  \"qualification\": \"oui\" ou \"non\",\n  \"qualification_reason\": \"maximum 10 mots, uniquement les signaux, pas d'interprétation\",\n  \"summary\": \"résumé en une phrase\",\n  \"hr_needs\": [\n    \"besoin RH 1\",\n    \"besoin RH 2\"\n  ],\n  \"note\": \"note CRM en 5 phrases maximum\"\n}\n\nInstructions pour le champ 'note' :\n1. Identifier les signaux observables.\n2. Expliquer ce qu'ils indiquent en matière de gestion RH.\n3. Expliquer pourquoi Dexprovider pourrait être pertinent.\n4. Se terminer par une conclusion commerciale claire.\n\nNe jamais écrire :\n* \"le score est élevé\" ou \"le score est faible\"\n* \"selon les critères\"\n* \"cette entreprise compte X salariés\"\n\nLa note doit apporter une analyse, pas une description.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1520,
+        544
+      ],
+      "id": "1f712f8d-7870-4fa3-91ed-edad66dd3da2",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        768
+      ],
+      "id": "197dfdee-91b6-4a7f-bddb-26454bacd669",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "QrRhsBqO3A81jdfC",
+          "name": "Ollama account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const originalData = $('Calculate Score1').first().json;\n\nlet aiResponse = $input.first().json.text;\n\nconst match = aiResponse.match(/\\{[\\s\\S]*\\}/);\nif (!match) throw new Error(\"No JSON found in AI response\");\n\nconst parsed = JSON.parse(match[0]);\n\n// Scoring engine owns these — never let LLM overwrite them\ndelete parsed.priority;\ndelete parsed.Priorité;\ndelete parsed.Score;\ndelete parsed.score;\n\nreturn [{\n  json: {\n    ...originalData,\n    ...parsed\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        544
+      ],
+      "id": "c152cf6f-409b-48c1-883c-4d155a2b415f",
+      "name": "Parse AI Response1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "68ac3954-114d-45b3-b906-b38dbf2cc3f6",
+              "name": "ProcessedAt",
+              "value": "={{$now}}",
+              "type": "string"
+            },
+            {
+              "id": "03d256ea-82da-4b08-86d3-f4a3d554f267",
+              "name": "WorkflowVersion",
+              "value": "V4",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        544
+      ],
+      "id": "9d2981a7-289a-44ee-89d6-6ee2bbd826ed",
+      "name": "Add Metadata1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q4eqx1gJTvDgk9Kt1j91jKekm9EYbpK_54MYCFA981A",
+          "mode": "list",
+          "cachedResultName": "Dexprovider_Prospects_Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q4eqx1gJTvDgk9Kt1j91jKekm9EYbpK_54MYCFA981A/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2125272569,
+          "mode": "list",
+          "cachedResultName": "Sheet1-Main Prospect Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q4eqx1gJTvDgk9Kt1j91jKekm9EYbpK_54MYCFA981A/edit#gid=2125272569"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Correspondance ICP": "={{ $json.correspondanceICP }}",
+            "Notes": "={{ $json.note }}",
+            "Traité": "oui",
+            "row_number": "={{ $json.row_number }}",
+            "Nom de l'Entreprise": "={{ $json[\"Nom de l'Entreprise\"] }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Nom de l'Entreprise",
+              "displayName": "Nom de l'Entreprise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Secteur",
+              "displayName": "Secteur",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Effectif",
+              "displayName": "Effectif",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ville",
+              "displayName": "Ville",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Région",
+              "displayName": "Région",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Site Web",
+              "displayName": "Site Web",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn Entreprise",
+              "displayName": "LinkedIn Entreprise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Recrutement en cours",
+              "displayName": "Recrutement en cours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nb offres actives",
+              "displayName": "Nb offres actives",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "URL Offre d'emploi",
+              "displayName": "URL Offre d'emploi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Croissance visible",
+              "displayName": "Croissance visible",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Activité LinkedIn",
+              "displayName": "Activité LinkedIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Correspondance ICP",
+              "displayName": "Correspondance ICP",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Priorité",
+              "displayName": "Priorité",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Décideur identifié",
+              "displayName": "Décideur identifié",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom du contact",
+              "displayName": "Nom du contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fonction",
+              "displayName": "Fonction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn",
+              "displayName": "LinkedIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut",
+              "displayName": "Statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Traité",
+              "displayName": "Traité",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "locationDefine": {
+            "values": {
+              "headerRow": 2,
+              "firstDataRow": 3
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        544
+      ],
+      "id": "c48c8d16-4a63-49ff-a198-046558370ce4",
+      "name": "Mettre à jour la fiche1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mfIBL6Xr67cXijxs",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        400,
+        544
+      ],
+      "id": "53fe8645-b456-4922-a8e0-d0f7f44deb3c",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ $json[\"Nom de l'Entreprise\"] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-002",
+              "leftValue": "={{ $json[\"Traité\"] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        832,
+        544
+      ],
+      "id": "677a79b7-6c45-4559-8013-d4039efb664f",
+      "name": "Filtrer lignes à traiter"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        544
+      ],
+      "id": "998a6438-4ea3-49cc-a915-7df5fc40722e",
+      "name": "Loop Over Items"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lire Prospects Master1": {
+      "main": [
+        [
+          {
+            "node": "Filtrer lignes à traiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Score1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response1": {
+      "main": [
+        [
+          {
+            "node": "Add Metadata1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Metadata1": {
+      "main": [
+        [
+          {
+            "node": "Mettre à jour la fiche1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Lire Prospects Master1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrer lignes à traiter": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Calculate Score1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mettre à jour la fiche1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "592f6c34-a513-48bd-9663-7433133dbc69",
+  "meta": {
+    "instanceId": "41fb68852ba7e6e804bf4b245f8c45657ca8055f5e3b18f9403a64ddee6f56be"
+  },
+  "id": "oKbO4vsatlaC5BqR",
+  "tags": []
+}
